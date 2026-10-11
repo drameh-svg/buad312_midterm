@@ -9,6 +9,19 @@ library(tidyverse)
 # import the CSV and read blank cells as missing values
 tracks <- read.csv("tracks_simplified.csv", na.strings=c("", "NA"))
 
+#order by genre popularity
+genre_popularity <- tracks |>
+  group_by(genres) |>
+  summarize(
+    track_count = n(),
+    average_streams = mean(streams),
+    median_streams = median(streams),
+    total_streams = sum(streams)
+  ) |>
+  arrange(desc(median_streams))
+
+genre_popularity
+
 # Create the variables used in the cleaning and analysis sections.
 tracks_audit <- tracks |>
   mutate(duration_min=duration_ms/60000,
