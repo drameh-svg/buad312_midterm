@@ -96,7 +96,7 @@ summary(tracks_model)
 
 #######
 # 2. Descriptive comparisons and graphs
-# Contributed by: [your name]
+# Contributed by: Geo Ji
 
 # Count tracks and summarize streams within each group.
 genre_summary <- tracks_model |>
