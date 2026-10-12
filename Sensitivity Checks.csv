@@ -1,0 +1,10 @@
+"genre","sample","n","scenario_percent"
+"Hip-Hop/Rap","Main",1224,7.69263002611273
+"Hip-Hop/Rap","Without_residual_outliers",1223,7.62647461967234
+"Hip-Hop/Rap","Listed_markets_only",845,6.84150122567249
+"Pop","Main",1633,31.5046301465985
+"Pop","Without_residual_outliers",1633,31.5046301465985
+"Pop","Listed_markets_only",1013,19.5000413832134
+"Latin","Main",342,22.4304604870054
+"Latin","Without_residual_outliers",342,22.4304604870054
+"Latin","Listed_markets_only",241,17.5802022304195
