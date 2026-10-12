@@ -96,7 +96,7 @@ summary(tracks_model)
 
 #######
 # 2. Descriptive comparisons and graphs
-# Contributed by: [your name]
+# Contributed by: Geo Ji
 
 # Count tracks and summarize streams within each group.
 genre_summary <- tracks_model |>
@@ -147,7 +147,11 @@ round(cor(tracks_numeric), 2)
 
 ######
 # 3. Simple and multiple regression
+<<<<<<< HEAD
 # Contributed by: [Your Name]
+=======
+# Contributed by: [Brian Chun]
+>>>>>>> df729acbfe94138fd33605cb9321cb796b80bd8c
 
 # Fit a simple regression using streams in their original units.
 model_raw_simple <- lm(streams~explicit, data=tracks_model)
