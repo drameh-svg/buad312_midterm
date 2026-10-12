@@ -147,7 +147,7 @@ round(cor(tracks_numeric), 2)
 
 ######
 # 3. Simple and multiple regression
-# Contributed by: [your name]
+# Contributed by: [Brian Chun]
 
 # Fit a simple regression using streams in their original units.
 model_raw_simple <- lm(streams~explicit, data=tracks_model)
