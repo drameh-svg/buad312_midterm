@@ -25,6 +25,90 @@ library(moderndive)
 
 
 ############################################################
+# 0. LOAD AND PREPARE tracks_simplified.csv
+############################################################
+
+# Keep the CSV in the same folder as this R script or set your working
+# directory to the folder containing the CSV before running this line.
+tracks <- read.csv(
+  "tracks_simplified.csv",
+  na.strings=c("", "NA")
+)
+
+# Create duration in minutes and identify values needed for cleaning.
+tracks_prepared <- tracks |>
+  mutate(
+    duration_min=duration_ms/60000,
+    year_text=ifelse(
+      grepl("/", album_release_date),
+      sub(".*/", "", album_release_date),
+      substr(album_release_date, 1, 4)
+    ),
+    release_year=as.numeric(year_text)
+  )
+
+# Convert two-digit release years. The dataset ends in 2021, so values 00-26
+# are treated as 2000s and the remaining two-digit values as 1900s.
+tracks_prepared <- tracks_prepared |>
+  mutate(
+    release_year=case_when(
+      album_release_date=="0" ~ NA_real_,
+      release_year<=26 ~ release_year+2000,
+      release_year<100 ~ release_year+1900,
+      TRUE ~ release_year
+    )
+  )
+
+# Keep observations with valid positive outcome and rollout values.
+tracks_prepared <- tracks_prepared |>
+  filter(
+    streams>0,
+    duration_min>0,
+    album_total_tracks>0,
+    artist_followers>=0
+  )
+
+# Create the variables used throughout the analysis.
+tracks_prepared <- tracks_prepared |>
+  mutate(
+    log_streams=log(streams),
+    log_followers=log(artist_followers+1),
+    release_period=case_when(
+      release_year<=2009 ~ "Through 2009",
+      release_year<=2014 ~ "2010-2014",
+      release_year<=2017 ~ "2015-2017",
+      release_year>=2018 ~ "2018+"
+    ),
+    release_size=case_when(
+      album_total_tracks==1 ~ "1 track",
+      album_total_tracks<=6 ~ "2-6 tracks",
+      album_total_tracks>=7 ~ "7+ tracks"
+    )
+  )
+
+# Set categorical variables and their reference categories.
+tracks_prepared <- tracks_prepared |>
+  mutate(
+    genres=factor(genres),
+    genres=relevel(genres, ref="Hip-Hop/Rap"),
+    release_period=factor(
+      release_period,
+      levels=c("Through 2009", "2010-2014", "2015-2017", "2018+")
+    ),
+    release_size=factor(
+      release_size,
+      levels=c("1 track", "2-6 tracks", "7+ tracks")
+    )
+  )
+
+# Confirm that the CSV loaded and the variables were created correctly.
+dim(tracks_prepared)
+summary(tracks_prepared)
+table(tracks_prepared$genres)
+table(tracks_prepared$release_size)
+
+
+############################################################
 # 1. UMG COLOR PALETTE AND GRAPH THEME
 ############################################################
 
@@ -293,9 +377,7 @@ round(cor(pop_correlations), 2)
 round(cor(latin_correlations), 2)
 
 # INTERPRETATION:
-# Look at the log_streams row or column. Positive correlations mean both
-# variables tend to rise together; negative correlations mean one tends to
-# fall as the other rises. Correlation alone does not control for other factors.
+# Look at the log_streams row or column. 
 
 
 ############################################################
@@ -304,14 +386,19 @@ round(cor(latin_correlations), 2)
 
 # GRAPH 1: Streams by release size and genre.
 plot_release_size <- tracks_focus |>
-  ggplot(aes(x=release_size, y=log_streams, fill=genres))+
-  geom_boxplot(position=position_dodge(width=0.8), outlier.alpha=0.20)+
+  ggplot(aes(x=release_size, y=streams, fill=genres))+
+  stat_summary(
+    fun=median,
+    geom="col",
+    position="dodge",
+    color=umg_white
+  )+
   scale_fill_manual(values=genre_colors)+
   labs(
-    title="Streams by Release Size and Genre",
-    subtitle="Outcome shown on the natural-log scale",
+    title="Median Streams by Release Size and Genre",
+    subtitle="Median is used because streams are strongly right-skewed",
     x="Release Size",
-    y="Natural Log of Streams",
+    y="Median Streams",
     fill="Genre"
   )+
   umg_theme
@@ -351,15 +438,20 @@ tracks_since_2010 <- tracks_focus |>
 
 # GRAPH 4: Release size by release cohort.
 plot_release_time <- tracks_since_2010 |>
-  ggplot(aes(x=release_size, y=log_streams, fill=genres))+
-  geom_boxplot(outlier.alpha=0.15)+
+  ggplot(aes(x=release_size, y=streams, fill=genres))+
+  stat_summary(
+    fun=median,
+    geom="col",
+    position="dodge",
+    color=umg_white
+  )+
   facet_wrap(~release_cohort)+
   scale_fill_manual(values=genre_colors)+
   labs(
-    title="Release Size and Streams Across Release Cohorts",
+    title="Median Streams by Release Size Across Release Cohorts",
     subtitle="Cohorts compare release years; they are not annual stream histories",
     x="Release Size",
-    y="Natural Log of Streams",
+    y="Median Streams",
     fill="Genre"
   )+
   umg_theme
@@ -1188,7 +1280,7 @@ plot_follower_predictions <- follower_predictions |>
   geom_col(position="dodge")+
   scale_fill_manual(values=genre_colors)+
   labs(
-    title="Predicted Streams by Artist Audience Position",
+    title="Predicted Streams by Artist followers",
     subtitle="Comparison uses within-genre follower quartiles",
     x="Artist Position",
     y="Predicted Typical Streams",
@@ -1417,6 +1509,7 @@ plot_pop_qq
 plot_latin_residuals
 plot_latin_qq
 
+#note there seems to be 3 distinct stream categories for pop songs
 # DIAGNOSTIC INTERPRETATION:
 # Residual plot: look for random scatter around zero with no curve or funnel.
 # Q-Q plot: points close to the line support approximately normal residuals.
