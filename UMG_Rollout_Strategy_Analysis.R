@@ -60,6 +60,7 @@ umg_theme <- theme_minimal() +
 
 ############################################################
 # 2. PREPARE THE FULL AND FOCUS DATASETS
+# Contributed by Sonly Nguyen
 ############################################################
 
 # tracks_prepared already contains log_streams, log_followers,
