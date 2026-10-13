@@ -802,6 +802,10 @@ summary(model_followers_hiphop)
 summary(model_followers_pop)
 summary(model_followers_latin)
 
+model_pop_fol <- lm(log_streams~followers, data = filter(tracks_focus, genres=="Pop"))
+model_pop_release <- lm(log_streams~release_size, data = filter(tracks_focus, genres=="Pop"))
+model_pop_release <- lm(log_streams~release_size*genres, data = filter(tracks_focus))
+summary(model_pop_release)
 
 ############################################################
 # 10. COMBINED CONTROLLED MODEL
@@ -872,7 +876,6 @@ full_model_comparison <- bind_rows(
   model_metrics(model_full, "Full controlled model")
 )
 
-full_model_comparison
 
 # HOW TO IDENTIFY THE MOST IMPORTANT VARIABLE:
 # Do not compare raw coefficient sizes because the variables use different units.
@@ -896,7 +899,7 @@ model_hiphop_full <- lm(
 )
 
 model_pop_full <- lm(
-  log_streams~release_size+duration_min+log_followers+years_since_2010,
+  log_streams~release_size*duration_min*log_followers*years_since_2010,
   data=tracks_focus |> filter(genres=="Pop")
 )
 
@@ -938,6 +941,20 @@ anova(latin_no_release, model_latin_full)
 # Duration, log_followers, and years_since_2010 each have one coefficient.
 # Their individual p-values appear directly in each summary() output.
 
+# Hip-Hop/Rap: Duration × Artist Followers Interaction Model
+model_hiphop_interaction <- lm(
+  log_streams ~ duration_min*log_followers*release_size,
+  data = filter(tracks_focus, genres == "Hip-Hop/Rap")
+)
+
+# Model coefficients, p-values, and R-squared
+summary(model_hiphop_interaction)
+
+# Model evaluation: R², Adjusted R², RMSE, and overall p-value
+model_metrics(
+  model_hiphop_interaction,
+  "Hip-Hop/Rap: Duration × Followers Interaction"
+)
 
 ############################################################
 # 12. CONTROLLED RELEASE-SIZE PREDICTIONS
@@ -1272,10 +1289,10 @@ follower_predictions <- follower_predictions |>
 follower_predictions
 
 plot_follower_predictions <- follower_predictions |>
+  filter(genres=="Hip-Hop/Rap") |> 
   ggplot(aes(
     x=artist_position,
-    y=predicted_streams,
-    fill=genres
+    y=predicted_streams
   ))+
   geom_col(position="dodge")+
   scale_fill_manual(values=genre_colors)+
@@ -1284,7 +1301,6 @@ plot_follower_predictions <- follower_predictions |>
     subtitle="Comparison uses within-genre follower quartiles",
     x="Artist Position",
     y="Predicted Typical Streams",
-    fill="Genre"
   )+
   umg_theme+
   theme(axis.text.x=element_text(angle=15, hjust=1))
