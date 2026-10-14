@@ -891,7 +891,7 @@ model_hiphop_full <- lm(
 )
 
 model_pop_full <- lm(
-  log_streams~release_size*duration_min*log_followers*years_since_2010,
+  log_streams~release_size+duration_min+log_followers+years_since_2010,
   data=tracks_focus |> filter(genres=="Pop")
 )
 
@@ -1308,6 +1308,202 @@ plot_follower_predictions
 # more evidence that emerging artists can compete on streams within that genre.
 # This still does not compare investment costs or prove causal return on spending.
 
+############################################################
+# GROUP MEMBER 5 CONTINUED: GEO JI
+# Model tables and Graphs for Slides 11 & 12 (Hip Hop & Rap) 
+############################################################
+
+model_hiphop_controlled <- lm(
+  log_streams~release_size+duration_min+log_followers+years_since_2010,
+  data=tracks_focus |> filter(genres=="Hip-Hop/Rap")
+)
+
+model_pop_controlled <- lm(
+  log_streams~release_size+duration_min+log_followers+years_since_2010,
+  data=tracks_focus |> filter(genres=="Pop")
+)
+
+# Controlled p-values
+hiphop_controlled_p <- c(
+  anova(hiphop_no_release, model_hiphop_controlled)$`Pr(>F)`[2],
+  coef(summary(model_hiphop_controlled))["duration_min", 4],
+  coef(summary(model_hiphop_controlled))["log_followers", 4],
+  NA
+)
+
+pop_controlled_p <- c(
+  anova(pop_no_release, model_pop_controlled)$`Pr(>F)`[2],
+  coef(summary(model_pop_controlled))["duration_min", 4],
+  coef(summary(model_pop_controlled))["log_followers", 4],
+  NA
+)
+
+# SLIDE 11 TABLE: Hip-Hop/Rap model summary.
+hiphop_model_table <- bind_rows(
+  model_metrics(model_release_hiphop, "Release Size"),
+  model_metrics(model_duration_hiphop, "Track Duration"),
+  model_metrics(model_followers_hiphop, "Artist Followers"),
+  model_metrics(model_hiphop_controlled, "Hip-Hop Full")
+) |>
+  rename(p_value=overall_p_value) |>
+  mutate(controlled_p_value=hiphop_controlled_p) |>
+  select(model, p_value, controlled_p_value,
+         r_squared, adjusted_r_squared, rmse)
+
+hiphop_model_table
+
+# SLIDE 12 TABLE: Pop model summary.
+pop_model_table <- bind_rows(
+  model_metrics(model_release_pop, "Release Size"),
+  model_metrics(model_duration_pop, "Track Duration"),
+  model_metrics(model_followers_pop, "Artist Followers"),
+  model_metrics(model_pop_controlled, "Pop Full")
+) |>
+  rename(p_value=overall_p_value) |>
+  mutate(controlled_p_value=pop_controlled_p) |>
+  select(model, p_value, controlled_p_value,
+         r_squared, adjusted_r_squared, rmse)
+
+pop_model_table
+
+
+# SLIDE 11 GRAPH: predicted streams by artist position, Hip-Hop/Rap only.
+# Followers set at the Hip-Hop 25th, 50th, and 75th percentiles; release size
+# fixed at a single; duration and release year at the Hip-Hop medians.
+hiphop_typical <- tracks_focus |>
+  filter(genres=="Hip-Hop/Rap") |>
+  summarize(
+    typical_duration=median(duration_min),
+    typical_years_since_2010=median(years_since_2010),
+    emerging_log_followers=quantile(log_followers, 0.25),
+    typical_log_followers=median(log_followers),
+    established_log_followers=quantile(log_followers, 0.75)
+  )
+
+hiphop_artist_predictions <- data.frame(
+  artist_position=factor(
+    c("Emerging\n(25th percentile)", "Typical\n(median)",
+      "Established\n(75th percentile)"),
+    levels=c("Emerging\n(25th percentile)", "Typical\n(median)",
+             "Established\n(75th percentile)")
+  ),
+  log_followers=c(hiphop_typical$emerging_log_followers,
+                  hiphop_typical$typical_log_followers,
+                  hiphop_typical$established_log_followers),
+  release_size=factor("1 track", levels=levels(tracks_focus$release_size)),
+  duration_min=hiphop_typical$typical_duration,
+  years_since_2010=hiphop_typical$typical_years_since_2010
+)
+
+# predict() returns log streams; exp() converts back to streams.
+hiphop_artist_predictions$predicted_streams <- exp(predict(
+  model_hiphop_controlled, newdata=hiphop_artist_predictions
+))
+
+hiphop_artist_predictions <- hiphop_artist_predictions |>
+  mutate(
+    follower_count=round(exp(log_followers)-1),
+    percent_change_vs_emerging=
+      100*(predicted_streams-predicted_streams[1])/predicted_streams[1]
+  )
+
+hiphop_artist_predictions
+
+# Per-unit version of the follower effect: percent change in streams for a
+# doubling of followers (2^coefficient instead of exp(coefficient)).
+hiphop_followers_per_doubling <-
+  100*(2^coef(model_hiphop_controlled)["log_followers"]-1)
+
+hiphop_followers_per_doubling
+
+slide_green <- "#4BA57B"   # accent color used on slide 11
+
+plot_slide11_hiphop_artists <- hiphop_artist_predictions |>
+  ggplot(aes(x=artist_position, y=predicted_streams))+
+  geom_col(fill=slide_green, width=0.6)+
+  geom_text(aes(label=scales::comma(round(predicted_streams))),
+            vjust=-0.5, size=4.5, fontface="bold")+
+  scale_y_continuous(labels=scales::comma,
+                     expand=expansion(mult=c(0, 0.12)))+
+  labs(
+    title="Hip-Hop/Rap: Predicted Streams by Artist Audience Position",
+    x="Artist Position",
+    y="Predicted Typical Streams"
+  )+
+  umg_theme+
+  theme(
+    axis.text.x=element_text(angle=0, hjust=0.5, size=11),
+    panel.grid.major.x=element_blank()
+  )
+
+plot_slide11_hiphop_artists
+
+
+# SLIDE 12 GRAPH: predicted streams by release size, Pop only, indexed so the
+# single = 100. Duration, followers, and release year at the Pop medians.
+pop_typical <- tracks_focus |>
+  filter(genres=="Pop") |>
+  summarize(
+    typical_duration=median(duration_min),
+    typical_log_followers=median(log_followers),
+    typical_years_since_2010=median(years_since_2010)
+  )
+
+pop_release_size_predictions <- data.frame(
+  release_size=factor(levels(tracks_focus$release_size),
+                      levels=levels(tracks_focus$release_size)),
+  duration_min=pop_typical$typical_duration,
+  log_followers=pop_typical$typical_log_followers,
+  years_since_2010=pop_typical$typical_years_since_2010
+)
+
+pop_release_size_predictions$predicted_streams <- exp(predict(
+  model_pop_controlled, newdata=pop_release_size_predictions
+))
+
+pop_release_size_predictions <- pop_release_size_predictions |>
+  mutate(
+    index_vs_single=
+      100*predicted_streams/predicted_streams[release_size=="1 track"],
+    percent_vs_single=index_vs_single-100,
+    format_label=factor(
+      case_when(
+        release_size=="2-6 tracks" ~ "EP\n(2-6 tracks)",
+        release_size=="7+ tracks" ~ "Album\n(7+ tracks)",
+        release_size=="1 track" ~ "Single\n(1 track)"
+      ),
+      levels=c("EP\n(2-6 tracks)", "Album\n(7+ tracks)", "Single\n(1 track)")
+    )
+  )
+
+pop_release_size_predictions
+
+plot_slide12_pop_release_size <- pop_release_size_predictions |>
+  ggplot(aes(x=format_label, y=index_vs_single))+
+  geom_col(fill=umg_pink, width=0.6)+
+  geom_text(aes(label=sprintf("%.1f", index_vs_single)),
+            vjust=-0.5, size=4.5, fontface="bold")+
+  scale_y_continuous(breaks=seq(0, 100, 20),
+                     expand=expansion(mult=c(0, 0.12)))+
+  labs(
+    title="Pop: Predicted Streams Per Track by Release Size",
+    subtitle="Relative predicted streams, single = 100",
+    x="Release Size",
+    y="Predicted Streams (Single = 100)"
+  )+
+  umg_theme+
+  theme(
+    axis.text.x=element_text(angle=0, hjust=0.5, size=11),
+    panel.grid.major=element_line(color="#DDDDDD", linewidth=0.4),
+    panel.grid.minor=element_line(color="#EEEEEE", linewidth=0.3)
+  )
+
+plot_slide12_pop_release_size
+
+ggsave("slide11_hiphop_artist_position.png", plot_slide11_hiphop_artists,
+       width=10, height=6, dpi=300, bg="white")
+ggsave("slide12_pop_release_size_index.png", plot_slide12_pop_release_size,
+       width=10, height=6, dpi=300, bg="white")
 
 ############################################################
 # GROUP MEMBER 6 CONTINUED: ZEINAB DRAMEH
